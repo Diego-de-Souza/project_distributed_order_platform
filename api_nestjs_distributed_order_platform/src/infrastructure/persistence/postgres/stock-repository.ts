@@ -22,8 +22,14 @@ export class StockRepository implements StockRepositoryInterface {
         return this.toEntity(created);
     }
 
-    async findByProductId(productId: string): Promise<StockEntity | null> {
-        const stock = await this.stockModel.findByPk(productId);
+    async findByProductId(
+        productId: string,
+        transaction?: Transaction,
+    ): Promise<StockEntity | null> {
+        const stock = await this.stockModel.findByPk(productId, {
+            transaction,
+            lock: transaction ? Transaction.LOCK.UPDATE : undefined,
+        });
         return stock ? this.toEntity(stock) : null;
     }
 
@@ -32,7 +38,11 @@ export class StockRepository implements StockRepositoryInterface {
         return stocks.map((stock) => this.toEntity(stock));
     }
 
-    async update(stock: StockEntity, expectedVersion?: number): Promise<boolean> {
+    async update(
+        stock: StockEntity,
+        expectedVersion?: number,
+        transaction?: Transaction,
+    ): Promise<boolean> {
         const where: Record<string, unknown> = {
             product_id: stock.getProductId(),
         };
@@ -47,7 +57,7 @@ export class StockRepository implements StockRepositoryInterface {
                 reserved_quantity: stock.getReservedQuantity(),
                 version: stock.getVersion(),
             },
-            { where },
+            { where, transaction },
         );
 
         return affected > 0;

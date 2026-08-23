@@ -1,0 +1,3 @@
+
+
+export const GATEWAY_REPOSITORY = Symbol('GATEWAY_REPOSITORY');

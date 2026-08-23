@@ -1,0 +1,5 @@
+
+
+export const PAYMENT_REPOSITORY = Symbol('PAYMENT_REPOSITORY');
+
+export const UNIT_OF_WORK_REPOSITORY = Symbol('UNIT_OF_WORK_REPOSITORY');

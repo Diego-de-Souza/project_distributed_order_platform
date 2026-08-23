@@ -5,6 +5,8 @@ export class OrderEntity {
     private status: StatusOrder;
     private total: number;
     private items: OrderItemEntity[];
+    private paymentErrorCode: string | null = null;
+    private paymentErrorMessage: string | null = null;
 
     constructor(
         private readonly clientId: string,
@@ -51,6 +53,14 @@ export class OrderEntity {
         return this.version;
     }
 
+    getPaymentErrorCode(): string | null {
+        return this.paymentErrorCode;
+    }
+
+    getPaymentErrorMessage(): string | null {
+        return this.paymentErrorMessage;
+    }
+
     addItem(item: OrderItemEntity): void {
         this.items.push(item);
         this.calculateTotal();
@@ -75,6 +85,8 @@ export class OrderEntity {
         }
 
         this.status = StatusOrder.CONFIRMED;
+        this.paymentErrorCode = null;
+        this.paymentErrorMessage = null;
     }
 
     cancelOrder(): void {
@@ -82,6 +94,16 @@ export class OrderEntity {
             throw new Error('Order must be in pending status to be cancelled');
         }
 
+        this.status = StatusOrder.CANCELLED;
+    }
+
+    registerPaymentFailure(code: string, message: string): void {
+        if (this.status !== StatusOrder.PENDING) {
+            throw new Error('Order must be in pending status to register payment failure');
+        }
+
+        this.paymentErrorCode = code;
+        this.paymentErrorMessage = message;
         this.status = StatusOrder.CANCELLED;
     }
 

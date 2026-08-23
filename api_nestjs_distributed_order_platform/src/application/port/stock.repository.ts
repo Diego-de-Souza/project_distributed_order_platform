@@ -3,9 +3,16 @@ import { Transaction } from "sequelize";
 
 export interface StockRepositoryInterface {
     create(stock: StockEntity): Promise<StockEntity>;
-    findByProductId(productId: string): Promise<StockEntity | null>;
+    findByProductId(
+        productId: string,
+        transaction?: Transaction,
+    ): Promise<StockEntity | null>;
     findAll(): Promise<StockEntity[]>;
-    update(stock: StockEntity, expectedVersion?: number): Promise<boolean>;
+    update(
+        stock: StockEntity,
+        expectedVersion?: number,
+        transaction?: Transaction,
+    ): Promise<boolean>;
     delete(productId: string): Promise<void>;
     reserve(
         productId: string,

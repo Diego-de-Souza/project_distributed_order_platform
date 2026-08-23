@@ -69,6 +69,19 @@ export class StockEntity {
         this.version += 1;
     }
 
+    /** Consome reserva após pagamento aprovado (reserved ↓). */
+    consume(quantity: number): void {
+        if (quantity <= 0) {
+            throw new Error('Quantity must be greater than 0');
+        }
+        if (this.reservedQuantity < quantity) {
+            throw new Error('Insufficient reserved stock');
+        }
+
+        this.reservedQuantity -= quantity;
+        this.version += 1;
+    }
+
     setQuantities(availableQuantity: number, reservedQuantity: number): void {
         if (availableQuantity < 0 || reservedQuantity < 0) {
             throw new Error('Quantities must be greater than or equal to 0');
