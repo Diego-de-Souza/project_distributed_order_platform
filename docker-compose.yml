@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: distributed_order_platform_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
+      POSTGRES_DB: api_nestjs_distributed_order_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d api_nestjs_distributed_order_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: distributed_order_platform_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: distributed_order_platform_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
