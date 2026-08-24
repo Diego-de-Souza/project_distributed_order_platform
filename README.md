@@ -37,36 +37,63 @@ As 3 APIs podem representar:
 
 ## Node.js + NestJS - Clean Architecture
 
-Estrutura:
+Pasta: `api_nestjs_distributed_order_platform/`
+
+Estrutura atual (já no código):
 
 ```terminal
     src/
     ├── domain/
-    │   ├── entities/
-    │   ├── value-objects/
-    │   ├── services/
-    │   └── repositories/
+    │   └── entities/          # Client, Product, Stock, Order, OrderItem, Payment
     │
     ├── application/
-    │   ├── use-cases/
-    │   ├── dto/
-    │   └── ports/
+    │   ├── port/              # contratos (repositories, gateway, UoW)
+    │   └── use-case/          # client, product, stock, order, payment
     │
     ├── infrastructure/
-    │   ├── database/
-    │   ├── repositories/
-    │   ├── messaging/
-    │   └── cache/
+    │   ├── persistence/postgres/   # Sequelize models + repositories + UoW
+    │   └── payment/                # StubPaymentGateway (Stripe/MP depois)
     │
-    └── presentation/
-        ├── controllers/
-        ├── filters/
-        └── guards/
+    ├── presentation/
+    │   ├── http/              # controllers, dto, mappers
+    │   └── payment.controller.ts
+    │
+    ├── modules/               # Client, Product, Order, Payment
+    ├── shared/                # enums, interfaces, tokens DI
+    └── config/
 ```
 
-Aqui o foco será entender Dependency Inversion, separação entre dominio e infraestrutura e porque o dominio não deve conhecer TypeORM, Sequelize, PostgresSQL, Redis e etc.
+Ainda previstos (não implementados):
 
-### Concorrência
+```terminal
+    infrastructure/messaging/   # RabbitMQ publishers/consumers
+    infrastructure/cache/       # Redis
+    presentation/filters/
+    presentation/guards/
+    domain/value-objects/
+```
+
+Aqui o foco é Dependency Inversion: o domínio não conhece Sequelize, Postgres, Redis, RabbitMQ nem Stripe.
+
+### Progresso NestJS (snapshot)
+
+| Tema | Status |
+|------|--------|
+| Clean/Hex + DI + ports | ✅ |
+| Client / Product / Stock / Order REST | ✅ |
+| Payment + gateway stub + retry | ✅ |
+| Reserva/consumo/release de estoque + TX | ✅ |
+| Unit of Work | ✅ básico |
+| Redis / cache | ❌ |
+| RabbitMQ / eventos de domínio | ❌ |
+| Idempotency-Key HTTP | ❌ |
+| Auth / guards | ❌ |
+| OpenAPI | ❌ |
+| Filters de erro padronizados | ❌ |
+| Testes unitários / integração | ❌ |
+| Optimistic locking bem aplicado no estoque | ⚠️ parcial |
+
+### Concorrência (objetivo NestJS)
 
 ```terminal
     HTTP Request
@@ -77,11 +104,11 @@ Aqui o foco será entender Dependency Inversion, separação entre dominio e inf
         ▼
     Use Case
         │
-        ├──── PostgreSQL
+        ├──── PostgreSQL  (já)
         │
-        ├──── Redis
+        ├──── Redis       (próximo)
         │
-        └──── Message Broker
+        └──── Message Broker (próximo)
 ```
 
 Vamos trabalhar concorrência na criação de pedidos, evitando que duas requisições simultâneas consumam o mesmo estoque.
@@ -199,44 +226,49 @@ Para que o treinamento realmente seja comparável, as três APIs compartilham o 
 | **Stock**  | Estoque por produto (concorrência / reservas)         | `productId`, `availableQuantity`, `reservedQuantity`, `version`                    |
 | **Order**  | Agregado raiz do pedido                               | `id`, `clientId`, `items`, `status`, `total`, `version`                            |
 | **OrderItem** | Item imutável no momento da compra                 | `productId`, `quantity`, `unitPrice`, `subtotal` (= quantity × unitPrice)          |
-| **Payment**| (fase posterior) liquidação financeira do pedido      | a definir na fase de pagamento                                                     |
+| **Payment**| Liquidação financeira do pedido                       | `id`, `orderId`, `amount`, `status`, `attempts`, `lastError*`, `gatewayRawResponse` |
 
-Estados do pedido: `pending` → `confirmed` \| `cancelled` (transições controladas pelo domínio).
+Estados do pedido: `pending` → `confirmed` \| `cancelled` (domínio controla as transições).
 
-Regras explícitas já refletidas no código:
+Estados do pagamento: `pending` → `paid` \| `failed` (também: `authorized`, `cancelled` previstos).
+
+Ciclo de estoque no fluxo atual:
+
+```terminal
+    CreateOrder  → stock.reserve()   (available ↓, reserved ↑)
+    Payment OK   → stock.consume()   (reserved ↓)
+    Payment FAIL → stock.release()   (reserved ↓, available ↑)
+    CancelOrder  → stock.release()
+```
+
+Regras já no código:
 
 - cliente `inactive` não cria pedido
 - produto `inactive` não entra em pedido novo
-- reserva de estoque exige `availableQuantity >= requestedQuantity`
-- preço do item é o preço do produto no momento da criação (snapshot)
+- reserva exige `availableQuantity >= requestedQuantity`
+- preço do item = snapshot no momento da criação do pedido
+- payment usa total do order; gateway stub + retry em timeout (até 3x)
+- falha de negócio (ex.: cartão negado) **não** faz retry
 
-Fluxo:
+Fluxo atual:
 ```terminal
     Client
     │
     ▼
-    Criar Order
+    Criar Order (+ reservar Stock)
     │
     ▼
-    Validar Products
+    POST /payments
+    │
+    ├─ sucesso → consume Stock + Payment PAID + Order CONFIRMED
+    │
+    └─ falha   → release Stock + Payment FAILED + Order CANCELLED
     │
     ▼
-    Reservar Stock
-    │
-    ▼
-    Calcular Order
-    │
-    ▼
-    Processar Payment (fase posterior)
-    │
-    ▼
-    Order confirmado
-    │
-    ▼
-    Publicar evento
+    Publicar evento   ← ainda NÃO implementado
 ```
 
-Contrato REST (mesmas rotas nas 3 APIs; nomenclatura alinhada ao domínio):
+Contrato REST (NestJS já expõe):
 
 ```terminal
     Clients
@@ -259,6 +291,9 @@ Contrato REST (mesmas rotas nas 3 APIs; nomenclatura alinhada ao domínio):
     GET    /orders
     POST   /orders/{id}/confirm
     POST   /orders/{id}/cancel
+
+    Payments
+    POST   /payments          # body: { "order_id": "..." }
 ```
 
 Criaremos cenários deliberadamente problemáticos, por exemplo:
@@ -308,14 +343,17 @@ Fase 1 — Fundamentos
 Fase 2 — API Node/NestJS
 
 ```terminal
-    Clean Architecture
-    Dependency Injection
-    Repository Pattern
-    Unit Tests
-    Integration Tests
-    Concurrency
-    Redis
-    RabbitMQ
+    Clean Architecture          ✅
+    Dependency Injection        ✅
+    Repository Pattern          ✅
+    Payment + Gateway Port      ✅ (stub)
+    Unit Tests                  ❌
+    Integration Tests           ❌
+    Concurrency hardening       ⚠️ parcial
+    Redis                       ❌
+    RabbitMQ                    ❌
+    Idempotency-Key HTTP        ❌
+    OpenAPI                     ❌
 ```
 
 Fase 3 — API Java/Spring
@@ -431,5 +469,5 @@ Para cada classe, módulo, interface e padrão, vamos responder:
                PostgreSQL       Redis       RabbitMQ
 ```
 
-Cada API terá seu próprio banco lógico/schema, evitando que uma API dependa diretamente das tabelas internas da outra.
+Cada API terá seu próprio banco lógico/schema (já preparado no `docker-compose` + init SQL), evitando que uma API dependa diretamente das tabelas internas da outra.
 

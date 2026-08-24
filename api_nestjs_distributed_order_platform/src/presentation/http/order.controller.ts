@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseInterceptors } from "@nestjs/common";
 import { CancelOrderUseCase } from "src/application/use-case/order/cancel-order.use-case";
 import { ConfirmOrderUseCase } from "src/application/use-case/order/confirm-order.use-case";
 import { CreateOrderUseCase } from "src/application/use-case/order/create-order.use-case";
@@ -6,6 +6,7 @@ import { GetOrderUseCase } from "src/application/use-case/order/get-order.use-ca
 import { ListOrdersUseCase } from "src/application/use-case/order/list-orders.use-case";
 import { toOrderResponse } from "./mappers/order.mapper";
 import { CreateOrderDto } from "./dto/order.dto";
+import { IdempotencyBodyInterceptor } from "./interceptor/idempotency-body.interceptor";
 
 @Controller('orders')
 export class OrderController {
@@ -18,6 +19,7 @@ export class OrderController {
     ) {}
 
     @Post()
+    @UseInterceptors(IdempotencyBodyInterceptor)
     async create(@Body() body: CreateOrderDto) {
         const order = await this.createOrderUseCase.execute(body);
         return toOrderResponse(order);
