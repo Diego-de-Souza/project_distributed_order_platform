@@ -54,10 +54,11 @@ describe('GetClientUseCase', () => {
         clientRepository.findById.mockResolvedValue(client);
 
         const result = await useCase.execute('client-1');
+        const data  = new Date()
 
         expect(result).toBe(client);
         expect(clientRepository.findById).toHaveBeenCalledWith('client-1');
-        expect(cacheStore.set).toHaveBeenCalledWith('client:client-1', { id: 'client-1', name: 'Client 1', email: 'client1@example.com', status: StatusClient.ACTIVE, createdAt: new Date(), updatedAt: new Date() }, 300);
+        expect(cacheStore.set).toHaveBeenCalledWith('client:client-1', { id: 'client-1', name: 'Client 1', email: 'client1@example.com', status: StatusClient.ACTIVE, createdAt: data, updatedAt: data }, 300);
     });
 
     it('throws NotFoundException when the client does not exist anywhere', async () => {
