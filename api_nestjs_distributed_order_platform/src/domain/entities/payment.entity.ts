@@ -79,6 +79,9 @@ export class PaymentEntity {
     }
 
     markAsFailed(errorCode: string, errorMessage: string, raw?: unknown): void {
+        if (this.status !== StatusPayment.PENDING) {
+            throw new Error('Payment is not pending');
+        }
         if (!errorCode) {
             throw new Error('Error code is required');
         }

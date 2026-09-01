@@ -67,6 +67,9 @@ export class OrderEntity {
     }
 
     addItem(item: OrderItemEntity): void {
+        if (!item) {
+            throw new Error('Item is required');
+        }
         this.items.push(item);
         this.calculateTotal();
         this.version += 1;

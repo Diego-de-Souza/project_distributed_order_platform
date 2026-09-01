@@ -58,6 +58,12 @@ describe('PaymentEntity', () => {
             expect(payment.getLastErrorCode()).toBe('1234567890');
         });
 
+        it('throws if payment is not pending', () => {
+            const payment = new PaymentEntity('1234567890', 100, StatusPayment.AUTHORIZED, '1234567890');
+
+            expect(() => payment.markAsFailed('1234567890', 'Payment failed')).toThrow('Payment is not pending');
+        });
+
         it('throws if errorCode is missing', () => {
             const payment = new PaymentEntity('1234567890', 100, StatusPayment.PENDING, '1234567890');
 

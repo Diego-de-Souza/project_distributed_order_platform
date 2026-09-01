@@ -31,7 +31,6 @@ import { EVENT_PUBLISHER, RABBITMQ_CLIENT } from 'src/shared/tokens_nest/rabbitm
     useClass: RabbitMQEventPublisher,
   }],
   providers: [
-    RabbitMQEventPublisher,
     {
       provide: EVENT_PUBLISHER,
       useClass: RabbitMQEventPublisher,

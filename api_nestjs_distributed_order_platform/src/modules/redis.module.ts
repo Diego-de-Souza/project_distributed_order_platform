@@ -30,8 +30,6 @@ import { RedisIdempotencyStore } from 'src/infrastructure/idempotency/redis-idem
       provide: CACHE_STORE,
       useClass: RedisCacheStore,
     },
-    RedisCacheStore,
-    RedisIdempotencyStore,
     {
       provide: IDEMPOTENCY_STORE,
       useClass: RedisIdempotencyStore,
