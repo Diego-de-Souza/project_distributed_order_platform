@@ -14,6 +14,8 @@ import { OrderController } from "src/presentation/http/order.controller";
 import { ORDER_REPOSITORY } from "src/shared/tokens_nest/order.token";
 import { RedisModule } from "./redis.module";
 import { IdempotencyBodyInterceptor } from "src/presentation/http/interceptor/idempotency-body.interceptor";
+import { RabbitMQModule } from "./rabbit-mq.module";
+import { StockModule } from "./stock.module";
 
 @Module({
     imports: [
@@ -21,6 +23,8 @@ import { IdempotencyBodyInterceptor } from "src/presentation/http/interceptor/id
         ClientModule,
         ProductModule,
         RedisModule,
+        RabbitMQModule,
+        StockModule
     ],
     controllers: [OrderController],
     providers: [

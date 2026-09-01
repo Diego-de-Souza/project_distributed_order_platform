@@ -1,4 +1,4 @@
-import { Module, OnApplicationBootstrap } from '@nestjs/common';
+import { MiddlewareConsumer, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { sequelizeConfig } from './config/sequelize.config';
@@ -9,6 +9,9 @@ import { ProductModule } from './modules/product.module';
 import { RedisModule } from './modules/redis.module';
 import { HealthController } from './presentation/http/health.controller';
 import { HealthService } from './application/service/health.service';
+import { RabbitMQModule } from './modules/rabbit-mq.module';
+import { CorrelationIdMiddleware } from './presentation/http/middleware/correlation-id.middleware';
+import { StockModule } from './modules/stock.module';
 
 @Module({
   imports: [
@@ -22,6 +25,8 @@ import { HealthService } from './application/service/health.service';
     ProductModule,
     OrderModule,
     PaymentModule,
+    RabbitMQModule,
+    StockModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -49,5 +54,9 @@ export class AppModule implements OnApplicationBootstrap{
     }
 
     console.log('Server ready');
+  }
+
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
   }
 }

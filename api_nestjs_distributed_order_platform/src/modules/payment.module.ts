@@ -19,6 +19,8 @@ import {
     UNIT_OF_WORK_REPOSITORY,
 } from "src/shared/tokens_nest/payment.token";
 import { RedisModule } from "./redis.module";
+import { RabbitMQModule } from "./rabbit-mq.module";
+import { StockModule } from "./stock.module";
 
 @Module({
     imports: [
@@ -29,6 +31,8 @@ import { RedisModule } from "./redis.module";
             OrderItemModel,
             StockModel,
         ]),
+        RabbitMQModule,
+        StockModule
     ],
     controllers: [PaymentController],
     providers: [
@@ -55,6 +59,12 @@ import { RedisModule } from "./redis.module";
         },
         CreatePaymentUseCase,
         IdempotencyBodyInterceptor,
+    ],
+    exports: [
+        PAYMENT_REPOSITORY,
+        CreatePaymentUseCase,
+        IdempotencyBodyInterceptor,
+        PaymentRepository
     ],
 })
 export class PaymentModule {}

@@ -3,7 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import redisConfig from '../config/redis.config';
 import { RedisConfig } from '../shared/interfaces/redis.interface';
-import { REDIS_CLIENT } from 'src/shared/tokens_nest/redis.token';
+import { CACHE_STORE, REDIS_CLIENT } from 'src/shared/tokens_nest/redis.token';
+import { RedisCacheStore } from 'src/infrastructure/cache/redis-cache.store';
 
 @Global()
 @Module({
@@ -24,7 +25,12 @@ import { REDIS_CLIENT } from 'src/shared/tokens_nest/redis.token';
       },
       inject: [ConfigService],
     },
+    {
+      provide: CACHE_STORE,
+      useClass: RedisCacheStore,
+    },
+    RedisCacheStore,
   ],
-  exports: [REDIS_CLIENT],
+  exports: [REDIS_CLIENT, CACHE_STORE],
 })
 export class RedisModule {}

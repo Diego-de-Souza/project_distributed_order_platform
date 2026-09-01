@@ -6,7 +6,9 @@ import { UpdateStockUseCase } from "src/application/use-case/stock/update-stock.
 import { toStockResponse } from "./mappers/stock.mapper";
 import { UpdateStockDto } from "./dto/stock.dto";
 import { StockQuantityDto } from "./dto/stock.dto";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
+@ApiTags('Stock')
 @Controller('stock')
 export class StockController {
     constructor(
@@ -17,12 +19,18 @@ export class StockController {
     ) {}
 
     @Get(':productId')
+    @ApiOperation({ summary: 'Obtém o estoque de um produto por ID' })
+    @ApiResponse({ status: 200, description: 'Estoque obtido com sucesso' })
+    @ApiResponse({ status: 400, description: 'Erro ao obter estoque' })
     async getByProductId(@Param('productId') productId: string) {
         const stock = await this.getStockUseCase.execute(productId);
         return toStockResponse(stock);
     }
 
     @Put(':productId')
+    @ApiOperation({ summary: 'Atualiza o estoque de um produto por ID' })
+    @ApiResponse({ status: 200, description: 'Estoque atualizado com sucesso' })
+    @ApiResponse({ status: 400, description: 'Erro ao atualizar estoque' })
     async update(
         @Param('productId') productId: string,
         @Body() body: UpdateStockDto,
@@ -36,6 +44,9 @@ export class StockController {
     }
 
     @Post(':productId/reserve')
+    @ApiOperation({ summary: 'Reserva o estoque de um produto por ID' })
+    @ApiResponse({ status: 200, description: 'Estoque reservado com sucesso' })
+    @ApiResponse({ status: 400, description: 'Erro ao reservar estoque' })
     async reserve(
         @Param('productId') productId: string,
         @Body() body: StockQuantityDto,
@@ -48,6 +59,9 @@ export class StockController {
     }
 
     @Post(':productId/release')
+    @ApiOperation({ summary: 'Libera o estoque de um produto por ID' })
+    @ApiResponse({ status: 200, description: 'Estoque liberado com sucesso' })
+    @ApiResponse({ status: 400, description: 'Erro ao liberar estoque' })
     async release(
         @Param('productId') productId: string,
         @Body() body: StockQuantityDto,
