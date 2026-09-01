@@ -7,7 +7,7 @@ import { AppModule } from './../src/app.module';
 describe('health check', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
