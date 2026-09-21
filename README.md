@@ -84,14 +84,14 @@ Aqui o foco é Dependency Inversion: o domínio não conhece Sequelize, Postgres
 | Payment + gateway stub + retry | ✅ |
 | Reserva/consumo/release de estoque + TX | ✅ |
 | Unit of Work | ✅ básico |
-| Redis / cache | ❌ |
-| RabbitMQ / eventos de domínio | ❌ |
-| Idempotency-Key HTTP | ❌ |
+| Redis / cache | ✅ |
+| RabbitMQ / eventos de domínio | ✅ |
+| Idempotency-Key HTTP | ✅ |
 | Auth / guards | ❌ |
-| OpenAPI | ❌ |
-| Filters de erro padronizados | ❌ |
+| OpenAPI | ✅ |
+| Filters de erro padronizados | ✅ |
 | Testes unitários / integração | ❌ |
-| Optimistic locking bem aplicado no estoque | ⚠️ parcial |
+| Optimistic locking bem aplicado no estoque | ✅ |
 
 ### Concorrência (objetivo NestJS)
 
@@ -179,6 +179,28 @@ Tambem iremos ter :
 • virtual threads quando fizer sentido
 • concorrência em múltiplas requisições
 
+### Progresso Java (snapshot)
+
+Pasta: `api_java_distributed_order_platform/`
+
+| Tema | Status |
+|------|--------|
+| Hexagonal + DDD + ports | ✅ |
+| Client / Product / Stock / Order / Payment REST | ✅ |
+| Payment + gateway stub + retry com backoff | ✅ |
+| Reserva/consumo/release de estoque + `@Transactional` | ✅ |
+| Unit of Work (pagamento, `PROPAGATION_REQUIRES_NEW`) | ✅ |
+| Redis (cache-aside Client/Product + idempotency) | ✅ |
+| Idempotency-Key HTTP (filter dedicado) | ✅ |
+| Optimistic Locking (`@Version` em Stock/Order) | ✅ |
+| RabbitMQ / eventos de domínio real | ❌ (`LoggingEventPublisher` só loga por enquanto; fila real entra na Fase 5) |
+| Auth / guards | ❌ |
+| OpenAPI | ❌ |
+| `GlobalExceptionHandler` padronizado | ✅ |
+| Testes unitários (JUnit 5, sem Mockito) | ⚠️ parcial (2 casos: `CreateOrderUseCase`, `ReserveStockUseCase`) |
+
+**Limitação conhecida:** o Maven Central (e os espelhos conhecidos) está bloqueado pela política de rede do ambiente de desenvolvimento usado para montar esta API, então não foi possível rodar `mvn test`/`mvn compile` de verdade nesta rodada. A verificação foi manual: conferência de todos os 98 arquivos `.java` (declaração de pacote batendo com a pasta, todo `import com.project.order.*` resolvendo para um arquivo existente). Recomenda-se rodar `mvn test` localmente antes de considerar este módulo pronto para produção.
+
 ## Python + FastAPI - Event-Driven + CORS
 
 Essa será a API mais orientada a concorrência e processamento assíncrono.
@@ -213,6 +235,28 @@ trabalharemos com muitas funções assincronas, além de:
 • eventos de domínio
 
 Importante: vamos diferenciar concorrência de paralelismo, porque são conceitos diferentes e isso é fundamental para um engenheiro backend.
+
+### Progresso Python (snapshot)
+
+Pasta: `api_python_distributed_order_platform/`
+
+| Tema | Status |
+|------|--------|
+| CQRS explícito (`application/commands.py` / `application/queries.py`) | ✅ |
+| EventBus genérico (pub/sub em processo via `asyncio`) | ✅ |
+| Client / Product / Stock / Order / Payment REST | ✅ |
+| Payment + gateway stub + retry com backoff | ✅ |
+| UnitOfWork (pagamento, sessão SQLAlchemy dedicada) | ✅ |
+| Redis (cache-aside Client/Product + idempotency) | ✅ |
+| Idempotency-Key HTTP (middleware dedicado) | ✅ |
+| Optimistic Locking (`version_id_col` em Stock/Order) | ✅ |
+| RabbitMQ / eventos de domínio real | ❌ (`EventBus` é em processo; fila real entra na Fase 5) |
+| Auth / guards | ❌ |
+| OpenAPI | ✅ (gerado automaticamente pelo FastAPI em `/docs`) |
+| Exception handlers padronizados | ✅ |
+| Testes (`pytest`, fakes em memória) | ✅ 10 testes cobrindo estoque, pedido e pagamento (aprovado/recusado/timeout-com-retry) |
+
+Diferente do módulo Java, o PyPI **não** é bloqueado neste ambiente: `pip install -r requirements.txt`, `python -c "import app.main"` e `pytest` (10 passed) rodaram de verdade aqui, incluindo a geração do schema OpenAPI. Falta só validar contra Postgres/Redis reais (via `docker-compose` da raiz) fora deste ambiente.
 
 
 ## O mesmo domínio nas 3 APIs
@@ -274,6 +318,8 @@ Contrato REST (NestJS já expõe):
     Clients
     POST   /clients
     GET    /clients/{id}
+    GET    /clients
+    DELETE /clients/{id}
 
     Products
     POST   /products
@@ -359,27 +405,29 @@ Fase 2 — API Node/NestJS
 Fase 3 — API Java/Spring
 
 ```terminal
-    DDD
-    Hexagonal Architecture
-    Aggregates
-    Value Objects
-    Domain Events
-    Transactions
-    Optimistic Locking
-    Concurrency
+    DDD                          ✅
+    Hexagonal Architecture       ✅
+    Aggregates                   ✅
+    Value Objects (Money, Email) ✅
+    Domain Events                ⚠️ (publisher só loga, sem fila)
+    Transactions (@Transactional)✅
+    Optimistic Locking (@Version)✅
+    Concurrency                  ✅
+    Testes JUnit                 ⚠️ parcial
 ```
 
 Fase 4 — API Python/FastAPI
 
 ```terminal
-    asyncio
-    async/await
-    CQRS
-    Event-Driven Architecture
-    Workers
-    Message Broker
-    Idempotency
-    Retries
+    asyncio                      ✅
+    async/await                  ✅
+    CQRS (commands/queries)      ✅
+    Event-Driven Architecture    ✅ (EventBus em processo)
+    Workers                      ❌
+    Message Broker               ❌ (fica pra Fase 5)
+    Idempotency                  ✅
+    Retries (backoff no payment) ✅
+    Testes pytest                ✅ 10 testes
 ```
 
 Fase 5 — Engenharia distribuída
@@ -469,5 +517,11 @@ Para cada classe, módulo, interface e padrão, vamos responder:
                PostgreSQL       Redis       RabbitMQ
 ```
 
-Cada API terá seu próprio banco lógico/schema (já preparado no `docker-compose` + init SQL), evitando que uma API dependa diretamente das tabelas internas da outra.
+Cada API tem seu próprio banco lógico/schema (já preparado no `docker-compose` + init SQL), evitando que uma API dependa diretamente das tabelas internas da outra:
+
+| API | Banco |
+| --- | --- |
+| NestJS | `api_nestjs_distributed_order_platform` (via `POSTGRES_DB`) |
+| Java/Spring | `api_spring_distributed_order_platform` |
+| Python/FastAPI | `api_fastapi_distributed_order_platform` |
 

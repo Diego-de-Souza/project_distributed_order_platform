@@ -3,3 +3,5 @@
 
 CREATE DATABASE api_spring_distributed_order_platform;
 CREATE DATABASE api_svelte_distributed_order_platform;
+
+CREATE DATABASE api_fastapi_distributed_order_platform;
