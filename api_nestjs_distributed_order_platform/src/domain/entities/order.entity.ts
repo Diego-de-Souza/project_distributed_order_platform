@@ -7,6 +7,7 @@ export class OrderEntity {
     private items: OrderItemEntity[];
     private paymentErrorCode: string | null = null;
     private paymentErrorMessage: string | null = null;
+    private version: number;
 
     constructor(
         private readonly clientId: string,
@@ -14,15 +15,19 @@ export class OrderEntity {
         items?: OrderItemEntity[],
         status?: StatusOrder,
         total?: number,
-        private readonly version: number = 0,
+        version: number = 0,
     ) {
         if (!clientId) {
             throw new Error('Client ID is required');
+        }
+        if (version < 0) {
+            throw new Error('Version must be greater than or equal to 0');
         }
 
         this.items = items ? [...items] : [];
         this.status = status ?? StatusOrder.PENDING;
         this.total = total ?? 0;
+        this.version = version;
 
         if (this.items.length > 0 && total === undefined) {
             this.calculateTotal();
@@ -62,8 +67,12 @@ export class OrderEntity {
     }
 
     addItem(item: OrderItemEntity): void {
+        if (!item) {
+            throw new Error('Item is required');
+        }
         this.items.push(item);
         this.calculateTotal();
+        this.version += 1;
     }
 
     removeItem(productId: string): void {
@@ -77,6 +86,7 @@ export class OrderEntity {
 
         this.items.splice(index, 1);
         this.calculateTotal();
+        this.version += 1;
     }
 
     confirmOrder(): void {
@@ -87,6 +97,7 @@ export class OrderEntity {
         this.status = StatusOrder.CONFIRMED;
         this.paymentErrorCode = null;
         this.paymentErrorMessage = null;
+        this.version += 1;
     }
 
     cancelOrder(): void {
@@ -95,6 +106,7 @@ export class OrderEntity {
         }
 
         this.status = StatusOrder.CANCELLED;
+        this.version += 1;
     }
 
     registerPaymentFailure(code: string, message: string): void {
@@ -105,6 +117,7 @@ export class OrderEntity {
         this.paymentErrorCode = code;
         this.paymentErrorMessage = message;
         this.status = StatusOrder.CANCELLED;
+        this.version += 1;
     }
 
     private calculateTotal(): void {

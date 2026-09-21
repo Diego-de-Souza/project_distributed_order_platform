@@ -10,22 +10,29 @@ import { OrderRepository } from "src/infrastructure/persistence/postgres/order-r
 import { PaymentRepository } from "src/infrastructure/persistence/postgres/payment-repository";
 import { StockRepository } from "src/infrastructure/persistence/postgres/stock-repository";
 import { SequelizeUnitOfWork } from "src/infrastructure/persistence/postgres/unit-of-work.repository";
-import { PaymentController } from "src/presentation/payment.controller";
+import { IdempotencyBodyInterceptor } from "src/presentation/http/interceptor/idempotency-body.interceptor";
+import { PaymentController } from "src/presentation/http/payment.controller";
 import { GATEWAY_REPOSITORY } from "src/shared/tokens_nest/gateway.token";
 import { ORDER_REPOSITORY } from "src/shared/tokens_nest/order.token";
 import {
     PAYMENT_REPOSITORY,
     UNIT_OF_WORK_REPOSITORY,
 } from "src/shared/tokens_nest/payment.token";
+import { RedisModule } from "./redis.module";
+import { RabbitMQModule } from "./rabbit-mq.module";
+import { StockModule } from "./stock.module";
 
 @Module({
     imports: [
+        RedisModule,
         SequelizeModule.forFeature([
             PaymentModel,
             OrderModel,
             OrderItemModel,
             StockModel,
         ]),
+        RabbitMQModule,
+        StockModule
     ],
     controllers: [PaymentController],
     providers: [
@@ -51,6 +58,13 @@ import {
             useClass: StubPaymentGateway,
         },
         CreatePaymentUseCase,
+        IdempotencyBodyInterceptor,
+    ],
+    exports: [
+        PAYMENT_REPOSITORY,
+        CreatePaymentUseCase,
+        IdempotencyBodyInterceptor,
+        PaymentRepository
     ],
 })
 export class PaymentModule {}

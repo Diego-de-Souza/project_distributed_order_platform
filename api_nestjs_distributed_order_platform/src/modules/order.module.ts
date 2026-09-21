@@ -12,12 +12,19 @@ import { ClientModule } from "src/modules/client.module";
 import { ProductModule } from "src/modules/product.module";
 import { OrderController } from "src/presentation/http/order.controller";
 import { ORDER_REPOSITORY } from "src/shared/tokens_nest/order.token";
+import { RedisModule } from "./redis.module";
+import { IdempotencyBodyInterceptor } from "src/presentation/http/interceptor/idempotency-body.interceptor";
+import { RabbitMQModule } from "./rabbit-mq.module";
+import { StockModule } from "./stock.module";
 
 @Module({
     imports: [
         SequelizeModule.forFeature([OrderModel, OrderItemModel]),
         ClientModule,
         ProductModule,
+        RedisModule,
+        RabbitMQModule,
+        StockModule
     ],
     controllers: [OrderController],
     providers: [
@@ -31,6 +38,7 @@ import { ORDER_REPOSITORY } from "src/shared/tokens_nest/order.token";
         ListOrdersUseCase,
         ConfirmOrderUseCase,
         CancelOrderUseCase,
+        IdempotencyBodyInterceptor
     ],
 })
 export class OrderModule {}

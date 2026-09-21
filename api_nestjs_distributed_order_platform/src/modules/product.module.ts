@@ -14,31 +14,22 @@ import { ProductController } from "src/presentation/http/product.controller";
 import { StockController } from "src/presentation/http/stock.controller";
 import { PRODUCT_REPOSITORY } from "src/shared/tokens_nest/product.token";
 import { STOCK_REPOSITORY } from "src/shared/tokens_nest/stock.token";
+import { StockModule } from "./stock.module";
 
 @Module({
-    imports: [SequelizeModule.forFeature([ProductModel, StockModel])],
-    controllers: [ProductController, StockController],
+    imports: [SequelizeModule.forFeature([ProductModel, StockModel]), StockModule],
+    controllers: [ProductController],
     providers: [
         ProductRepository,
-        StockRepository,
         {
             provide: PRODUCT_REPOSITORY,
             useClass: ProductRepository,
         },
-        {
-            provide: STOCK_REPOSITORY,
-            useClass: StockRepository,
-        },
         CreateProductUseCase,
         GetProductUseCase,
-        GetStockUseCase,
-        UpdateStockUseCase,
-        ReserveStockUseCase,
-        ReleaseStockUseCase,
     ],
     exports: [
         PRODUCT_REPOSITORY,
-        STOCK_REPOSITORY,
         CreateProductUseCase,
         GetProductUseCase,
     ],

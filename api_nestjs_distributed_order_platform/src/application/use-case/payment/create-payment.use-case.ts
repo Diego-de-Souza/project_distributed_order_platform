@@ -2,13 +2,16 @@ import {
     BadRequestException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
+import type { EventPublisherRepositoryInterface } from "src/application/port/event-publisher.repository";
 import type { OrderRepositoryInterface } from "src/application/port/order.repository";
 import type { PaymentGatewayInterface } from "src/application/port/payment-gateway.repository";
 import type { PaymentRepositoryInterface } from "src/application/port/payment.repository";
 import type { UnitOfWorkInterface } from "src/application/port/unit-of-work.respository";
 import { PaymentEntity } from "src/domain/entities/payment.entity";
+import { StockEntity } from "src/domain/entities/stock.entity";
 import { StatusOrder } from "src/shared/enums/status-order.enum";
 import type { GatewayResult } from "src/shared/interfaces/gateway.interface";
 import type { PaymentCreateAttributes } from "src/shared/interfaces/payment.interface";
@@ -18,11 +21,14 @@ import {
     PAYMENT_REPOSITORY,
     UNIT_OF_WORK_REPOSITORY,
 } from "src/shared/tokens_nest/payment.token";
+import { EVENT_PUBLISHER } from "src/shared/tokens_nest/rabbitmq.token";
 
 const MAX_RETRIES = 3;
 
 @Injectable()
 export class CreatePaymentUseCase {
+    private readonly logger = new Logger(CreatePaymentUseCase.name);
+
     constructor(
         @Inject(PAYMENT_REPOSITORY)
         private readonly paymentRepository: PaymentRepositoryInterface,
@@ -32,6 +38,8 @@ export class CreatePaymentUseCase {
         private readonly uow: UnitOfWorkInterface,
         @Inject(GATEWAY_REPOSITORY)
         private readonly gateway: PaymentGatewayInterface,
+        @Inject(EVENT_PUBLISHER)
+        private readonly eventPublisher: EventPublisherRepositoryInterface,
     ) {}
 
     async execute(input: PaymentCreateAttributes): Promise<PaymentEntity> {
@@ -80,6 +88,15 @@ export class CreatePaymentUseCase {
                     await this.uow
                         .getStockRepository()
                         .update(stock, undefined, tx);
+
+                    try{
+                        await this.eventPublisher.publishStockConsumed(stock);
+                    }catch(error){
+                        this.logger.error(
+                            `Failed to publish StockConsumed for product ${item.getProductId()}`,
+                            error instanceof Error ? error.stack : String(error),
+                        );
+                    }
                 }
 
                 payment.markAsPaid(
@@ -87,6 +104,7 @@ export class CreatePaymentUseCase {
                     gatewayResult.raw,
                 );
                 order.confirmOrder();
+                
             } else {
                 const code = gatewayResult.errorCode ?? 'GATEWAY_ERROR';
                 const message =
@@ -96,9 +114,18 @@ export class CreatePaymentUseCase {
                 order.registerPaymentFailure(code, message);
 
                 for (const item of order.getItems()) {
-                    await this.uow
+                    const stock = await this.uow
                         .getStockRepository()
                         .release(item.getProductId(), item.getQuantity(), tx);
+                    
+                    try{
+                        await this.eventPublisher.publishStockReleased(stock);
+                    }catch(error){
+                        this.logger.error(
+                            `Failed to publish StockReleased for product ${item.getProductId()}`,
+                            error instanceof Error ? error.stack : String(error),
+                        );
+                    }
                 }
             }
 
@@ -107,9 +134,26 @@ export class CreatePaymentUseCase {
             await this.uow.commit();
         } catch (error) {
             await this.safeRollback();
+            try{
+                await this.eventPublisher.publishPaymentFailed(payment);
+            }catch(error){
+                this.logger.error(
+                    `Failed to publish PaymentFailed for payment ${payment.getId()}`,
+                    error instanceof Error ? error.stack : String(error),
+                );
+            }
             throw error;
         }
 
+        try{
+            gatewayResult.success? await this.eventPublisher.publishPaymentPaid(payment) : await this.eventPublisher.publishPaymentFailed(payment);
+        }catch(error){
+            this.logger.error(
+                `Failed to publish PaymentPaid for payment ${payment.getId()}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        }
+        
         return payment;
     }
 
